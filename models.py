@@ -1,0 +1,56 @@
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+    
+class SUREfcScene(nn.Module):  # 20, 59
+    def __init__(self):
+        super(SUREfcScene, self).__init__()
+        num_fea = 512
+
+        self.encoder0 = nn.Sequential(
+            nn.Linear(20, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(True),
+            nn.Dropout(0.1),
+            
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(True),
+            nn.Dropout(0.1),
+
+            nn.Linear(1024, num_fea),
+            nn.BatchNorm1d(num_fea),
+            nn.ReLU(True)
+        )
+
+        self.encoder1 = nn.Sequential(
+            nn.Linear(59, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(True),
+            nn.Dropout(0.1),
+
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(True),
+            nn.Dropout(0.1),
+
+            nn.Linear(1024, num_fea),
+            nn.BatchNorm1d(num_fea),
+            nn.ReLU(True)
+        )
+
+        self.decoder0 = nn.Sequential(nn.Linear(2 * num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
+                                      nn.Linear(1024, 1024), nn.ReLU(), nn.Dropout(0.1),
+                                      nn.Linear(1024, 20))
+        self.decoder1 = nn.Sequential(nn.Linear(2 * num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
+                                      nn.Linear(1024, 1024), nn.ReLU(), nn.Dropout(0.1),
+                                      nn.Linear(1024, 59))
+
+    def forward(self, x0, x1):
+        h0 = self.encoder0(x0)
+        h1 = self.encoder1(x1)
+        h0, h1 = F.normalize(h0, dim=1), F.normalize(h1, dim=1)
+        union = torch.cat([h0, h1], 1)
+        z0 = self.decoder0(union)
+        z1 = self.decoder1(union)
+        return h0, h1, z0, z1
