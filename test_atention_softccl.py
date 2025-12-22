@@ -222,18 +222,23 @@ def train_one_epoch(train_loader, models, criterions, optimizer, epoch, args, qu
         h0, h1, z0, z1 = backbone(x0_flat, x1_flat)
         loss_mse = criterion_mse(x0_flat, z0, batch_q1) + criterion_mse(x1_flat, z1, batch_q2)
         
+        # --- 修改前的 Phase 2 (激进版，导致震荡) ---
+        # if use_attention:
+        #     h0_final, h1_final = attention_mod(h0, h1)
+        #     loss_contrast = criterion_ccl(h0_final, h1_final, w0=None, w1=None) # Full CCL
+        #     loss = loss_mse + (1.0 * loss_contrast)
+
+        # --- 修改后的 Phase 2 (稳健版，推荐) ---
         if use_attention:
+            # 1. 依然使用 Attention 进行修复
             h0_final, h1_final = attention_mod(h0, h1)
             
-            # --- 可视化插入点 ---
-            if do_vis and not vis_done:
-                # 传入原始特征(h0)和增强后特征(h0_final)进行对比
-                visualize_repair_effect(h0, h1, h0_final, h1_final, batch_q1, batch_q2, epoch)
-                vis_done = True
-            # --------------------
-
-            loss_contrast = criterion_ccl(h0_final, h1_final, w0=None, w1=None)
-            loss = loss_mse + (1.0 * loss_contrast)
+            # 2. 【关键修改】依然使用 Weighted CCL，但允许权重稍微提升一点(可选)
+            #    这样既利用了修复后的特征，又保留了对顽固噪声的防御
+            loss_contrast = criterion_ccl(h0_final, h1_final, w0=batch_q1, w1=batch_q2)
+            
+            # 3. 系数保持 args.lamda (0.1)，不要突然改成 1.0，避免梯度爆炸
+            loss = loss_mse + (args.lamda * loss_contrast)
         else:
             h0_final, h1_final = h0, h1
             loss_contrast = criterion_ccl(h0_final, h1_final, w0=batch_q1, w1=batch_q2)
