@@ -13,10 +13,12 @@ from models import SUREfcScene
 from Clustering import Clustering
 from sure_inference import both_infer
 from data_loader import loader_cl
+from data_loader_noisy_scene import loader_cl_noise
+
 
 # 设置环境
 warnings.filterwarnings('ignore')
-os.environ['OMP_NUM_THREADS'] = "1"
+os.environ['OMP_NUM_THREADS'] = "2"
 
 # --- 参数设置 ---
 parser = argparse.ArgumentParser(description='Scene15 Clean Training (Recon + Contrastive)')
@@ -33,12 +35,6 @@ parser.add_argument('--tau', default=0.5, type=float, help='Temperature paramete
 parser.add_argument('--seed', default=1111, type=int, help='Random seed')
 parser.add_argument('--log-interval', default=50, type=int, help='Log interval')
 parser.add_argument('--data-name', default='Scene15', type=str, help='Dataset name')
-
-# 兼容性参数 (loader_cl 需要这些参数占位)
-parser.add_argument('--neg-prop', default=0, type=int)
-parser.add_argument('--aligned-prop', default=1.0, type=float)
-parser.add_argument('--complete-prop', default=1.0, type=float)
-parser.add_argument('--noisy-training', default=False, type=bool)
 
 args = parser.parse_args()
 
@@ -87,11 +83,11 @@ def train_one_epoch(train_loader, model, criterions, optimizer, epoch, args):
         x1 = x1.view(x1.size()[0], -1)
         
         # Forward pass
-        # model 返回: h0, h1 (hidden features), z0, z1 (reconstructed)
-        h0, h1, z0, z1 = model(x0, x1)
+        # model 返回: z0, z1 (hidden features), xr0, xr1 (reconstructed)
+        z0, z1, xr0, xr1 = model(x0, x1)
         
         # 1. Reconstruction Loss (MSE)
-        loss_mse = criterion_mse(x0, z0) + criterion_mse(x1, z1)
+        loss_mse = criterion_mse(x0, xr0) + criterion_mse(x1, xr1)
         
         # 2. Contrastive Loss (CCL)
         # 原始代码逻辑: loss_cl=lambda x1,x2,M: -(M * (x1.mm(x2.t())/args.tau).softmax(1).log()).sum(1).mean()
@@ -100,7 +96,7 @@ def train_one_epoch(train_loader, model, criterions, optimizer, epoch, args):
         # ---------------- 原版逻辑复现 ----------------
         loss_cl = lambda x_i, x_j, M: -(M * (x_i.mm(x_j.t()) / args.tau).softmax(1).log()).sum(1).mean()
         I = torch.eye(x0.size(0)).to(device)
-        loss_contrast = loss_cl(h0, h1, I)
+        loss_contrast = loss_cl(z0, z1, I)
         # -------------------------------------------
 
         # Total Loss
@@ -129,9 +125,8 @@ def main():
 
     # 3. 加载数据 (使用重构后的 clean loader)
     # 注意：loader_cl 内部会忽略 neg_prop 等噪声参数
-    train_loader, all_loader, _ = loader_cl(
-        args.batch_size, args.neg_prop, args.aligned_prop, 
-        args.complete_prop, args.noisy_training, args.data_name, args.seed
+    train_loader, all_loader, _ = loader_cl_noise(
+        args.batch_size, args.data_name, args.seed
     )
 
     # 4. 初始化模型 (针对 Scene15)

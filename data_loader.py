@@ -120,7 +120,7 @@ class CleanDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-def loader_cl(train_bs, neg_prop, aligned_prop, complete_prop, is_noise, dataset_name, NetSeed):
+def loader_cl(train_bs, dataset_name, NetSeed):
     """
     重构后的加载器接口。
     虽然参数列表为了兼容保持不变，但内部忽略了 neg_prop, is_noise 等参数。

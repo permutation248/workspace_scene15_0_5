@@ -34,13 +34,13 @@ def both_infer(model, device, all_loader, setting=2, cri=None, return_data=False
                 x0 = x0.view(x0.size(0), -1)
                 x1 = x1.view(x1.size(0), -1)
             
-            # 前向传播 (获取隐层特征 h0, h1)
-            # model 返回: h0, h1, z0, z1
-            h0, h1, _, _ = model(x0, x1)
+            # 前向传播 (获取隐层特征 z0, z1)
+            # model 返回: z0, z1, xr0, xr1
+            z0, z1, _, _ = model(x0, x1)
             
             # 收集特征 (转回 CPU numpy)
-            view0_features.append(h0.cpu().numpy())
-            view1_features.append(h1.cpu().numpy())
+            view0_features.append(z0.cpu().numpy())
+            view1_features.append(z1.cpu().numpy())
             all_labels.append(labels.cpu().numpy())
             
             if return_data:

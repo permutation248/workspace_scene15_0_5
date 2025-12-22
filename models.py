@@ -47,10 +47,10 @@ class SUREfcScene(nn.Module):  # 20, 59
                                       nn.Linear(1024, 59))
 
     def forward(self, x0, x1):
-        h0 = self.encoder0(x0)
-        h1 = self.encoder1(x1)
-        h0, h1 = F.normalize(h0, dim=1), F.normalize(h1, dim=1)
-        union = torch.cat([h0, h1], 1)
-        z0 = self.decoder0(union)
-        z1 = self.decoder1(union)
-        return h0, h1, z0, z1
+        z0 = self.encoder0(x0)
+        z1 = self.encoder1(x1)
+        z0, z1 = F.normalize(z0, dim=1), F.normalize(z1, dim=1)
+        union = torch.cat([z0, z1], 1)
+        xr0 = self.decoder0(union)
+        xr1 = self.decoder1(union)
+        return z0, z1, xr0, xr1

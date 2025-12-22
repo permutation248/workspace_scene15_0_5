@@ -122,7 +122,7 @@ class NoisySceneDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-def loader_cl(train_bs, neg_prop, aligned_prop, complete_prop, is_noise, dataset_name, NetSeed):
+def loader_cl_noise(train_bs, dataset_name, NetSeed):
     """
     加载 Scene15 并根据设定添加渐变混合噪声
     """
