@@ -104,7 +104,7 @@ def main():
     args = parser.parse_args()
 
     # --- 配置路径 ---
-    input_path = 'view_quality.npz'
+    input_path = 'corruption_ratety.npz'
     output_path = 'quality_weights.npz'
     plot_path = 'quality_score_verification.png'
 

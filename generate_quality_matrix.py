@@ -230,7 +230,7 @@ def main():
     # 6. 保存质量矩阵 (用于后续训练脚本)
     # 保存为 (N, 2) 的矩阵，或者分开保存
     # 这里我们保存为字典形式，方便读取
-    save_path = 'view_quality.npz'
+    save_path = 'corruption_ratety.npz'
     np.savez(save_path, 
              recon_loss_v1=recon_loss_v1, 
              recon_loss_v2=recon_loss_v2,

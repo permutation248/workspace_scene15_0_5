@@ -111,13 +111,13 @@ def main():
 
     # 1. 加载数据
     try:
-        data = np.load('view_quality.npz')
+        data = np.load('corruption_ratety.npz')
         loss_v1 = data['recon_loss_v1']
         loss_v2 = data['recon_loss_v2']
         total_samples = len(loss_v1)
-        print(f"Loaded view_quality.npz with {total_samples} samples.")
+        print(f"Loaded corruption_ratety.npz with {total_samples} samples.")
     except FileNotFoundError:
-        print("Error: view_quality.npz not found. Please run generate_quality_matrix.py first.")
+        print("Error: corruption_ratety.npz not found. Please run generate_quality_matrix.py first.")
         return
 
     # 2. 恢复 GT 噪声标签 (用于分析，实际无监督训练时不使用)

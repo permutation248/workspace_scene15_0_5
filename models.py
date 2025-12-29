@@ -144,10 +144,10 @@ class SUREfcScene(nn.Module):  # 20, 59
             nn.ReLU(True)
         )
 
-        self.decoder0 = nn.Sequential(nn.Linear(2 * num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
+        self.decoder0 = nn.Sequential(nn.Linear(num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
                                       nn.Linear(1024, 1024), nn.ReLU(), nn.Dropout(0.1),
                                       nn.Linear(1024, 20))
-        self.decoder1 = nn.Sequential(nn.Linear(2 * num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
+        self.decoder1 = nn.Sequential(nn.Linear(num_fea, 1024), nn.ReLU(), nn.Dropout(0.1), 
                                       nn.Linear(1024, 1024), nn.ReLU(), nn.Dropout(0.1),
                                       nn.Linear(1024, 59))
 
@@ -155,7 +155,6 @@ class SUREfcScene(nn.Module):  # 20, 59
         z0 = self.encoder0(x0)
         z1 = self.encoder1(x1)
         z0, z1 = F.normalize(z0, dim=1), F.normalize(z1, dim=1)
-        union = torch.cat([z0, z1], 1)
-        xr0 = self.decoder0(union)
-        xr1 = self.decoder1(union)
+        xr0 = self.decoder0(z0)
+        xr1 = self.decoder1(z1)
         return z0, z1, xr0, xr1
