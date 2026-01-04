@@ -46,7 +46,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # --- [可视化工具] 核心新增函数 ---
-def visualize_repair_effect(h0_orig, h1_orig, h0_new, h1_new, quality_v1, quality_v2, epoch, save_dir='vis_results'):
+def visualize_repair_effect(z0_orig, z1_orig, z0_new, z1_new, quality_v1, quality_v2, epoch, save_dir='vis_results'):
     """
     可视化 Attention 对不同质量样本的修复效果
     """
@@ -54,21 +54,21 @@ def visualize_repair_effect(h0_orig, h1_orig, h0_new, h1_new, quality_v1, qualit
         os.makedirs(save_dir)
 
     # 1. 准备数据 (转为 numpy)
-    h0_orig = F.normalize(h0_orig, dim=1).detach().cpu().numpy()
-    h1_orig = F.normalize(h1_orig, dim=1).detach().cpu().numpy()
-    h0_new = F.normalize(h0_new, dim=1).detach().cpu().numpy()
-    h1_new = F.normalize(h1_new, dim=1).detach().cpu().numpy()
+    z0_orig = F.normalize(z0_orig, dim=1).detach().cpu().numpy()
+    z1_orig = F.normalize(z1_orig, dim=1).detach().cpu().numpy()
+    z0_new = F.normalize(z0_new, dim=1).detach().cpu().numpy()
+    z1_new = F.normalize(z1_new, dim=1).detach().cpu().numpy()
     q1 = quality_v1.detach().cpu().numpy()
     
     # 2. 计算视图间的一致性 (Cosine Similarity)
-    # 原始一致性: diag(h0 @ h1.T)
-    sim_orig = (h0_orig * h1_orig).sum(axis=1)
+    # 原始一致性: diag(z0 @ z1.T)
+    sim_orig = (z0_orig * z1_orig).sum(axis=1)
     # 增强后一致性
-    sim_new = (h0_new * h1_new).sum(axis=1)
+    sim_new = (z0_new * z1_new).sum(axis=1)
     
     # 3. 计算特征漂移量 (Feature Drift): ||h_new - h_orig||
     # 这代表了 Attention 模块对原始特征改变了多少
-    drift_v1 = np.linalg.norm(h0_new - h0_orig, axis=1)
+    drift_v1 = np.linalg.norm(z0_new - z0_orig, axis=1)
     
     # --- 图表 1: 散点图 (质量 vs. 修复强度) ---
     plt.figure(figsize=(10, 5))
@@ -136,27 +136,27 @@ class CrossViewSemanticEnhancement(nn.Module):
         
         self.layer_norm = nn.LayerNorm(feature_dim)
 
-    def forward(self, h0, h1):
+    def forward(self, z0, z1):
         # View 1 增强 (利用 View 2)
-        q1 = self.w_q1(h0)
-        k1 = self.w_k1(h1)
-        v1 = self.w_v1(h1)
+        q1 = self.w_q1(z0)
+        k1 = self.w_k1(z1)
+        v1 = self.w_v1(z1)
         
         attn_score1 = torch.matmul(q1, k1.transpose(-2, -1)) * self.scale
         attn_prob1 = F.softmax(attn_score1, dim=-1)
-        h0_enhanced = torch.matmul(attn_prob1, v1)
+        z0_enhanced = torch.matmul(attn_prob1, v1)
         
         # View 2 增强 (利用 View 1)
-        q2 = self.w_q2(h1)
-        k2 = self.w_k2(h0)
-        v2 = self.w_v2(h0)
+        q2 = self.w_q2(z1)
+        k2 = self.w_k2(z0)
+        v2 = self.w_v2(z0)
         
         attn_score2 = torch.matmul(q2, k2.transpose(-2, -1)) * self.scale
         attn_prob2 = F.softmax(attn_score2, dim=-1)
-        h1_enhanced = torch.matmul(attn_prob2, v2)
+        z1_enhanced = torch.matmul(attn_prob2, v2)
         
-        z0_final = self.layer_norm(h0 + h0_enhanced)
-        z1_final = self.layer_norm(h1 + h1_enhanced)
+        z0_final = self.layer_norm(z0 + z0_enhanced)
+        z1_final = self.layer_norm(z1 + z1_enhanced)
         
         return z0_final, z1_final
 
@@ -219,24 +219,24 @@ def train_one_epoch(train_loader, models, criterions, optimizer, epoch, args, qu
         x0_flat = x0.view(x0.size(0), -1)
         x1_flat = x1.view(x1.size(0), -1)
         
-        h0, h1, z0, z1 = backbone(x0_flat, x1_flat)
+        z0, z1, z0, z1 = backbone(x0_flat, x1_flat)
         loss_mse = criterion_mse(x0_flat, z0, batch_q1) + criterion_mse(x1_flat, z1, batch_q2)
         
         if use_attention:
-            h0_final, h1_final = attention_mod(h0, h1)
+            z0_final, z1_final = attention_mod(z0, z1)
             
             # --- 可视化插入点 ---
             if do_vis and not vis_done:
-                # 传入原始特征(h0)和增强后特征(h0_final)进行对比
-                visualize_repair_effect(h0, h1, h0_final, h1_final, batch_q1, batch_q2, epoch)
+                # 传入原始特征(z0)和增强后特征(z0_final)进行对比
+                visualize_repair_effect(z0, z1, z0_final, z1_final, batch_q1, batch_q2, epoch)
                 vis_done = True
             # --------------------
 
-            loss_contrast = criterion_ccl(h0_final, h1_final, w0=None, w1=None)
+            loss_contrast = criterion_ccl(z0_final, z1_final, w0=None, w1=None)
             loss = loss_mse + (1.0 * loss_contrast)
         else:
-            h0_final, h1_final = h0, h1
-            loss_contrast = criterion_ccl(h0_final, h1_final, w0=batch_q1, w1=batch_q2)
+            z0_final, z1_final = z0, z1
+            loss_contrast = criterion_ccl(z0_final, z1_final, w0=batch_q1, w1=batch_q2)
             loss = loss_mse + (args.lamda * loss_contrast)
         
         optimizer.zero_grad()
@@ -304,13 +304,13 @@ def main():
                     x0_flat = x0.view(x0.size(0), -1)
                     x1_flat = x1.view(x1.size(0), -1)
                     
-                    h0, h1, _, _ = backbone(x0_flat, x1_flat)
+                    z0, z1, _, _ = backbone(x0_flat, x1_flat)
                     
                     if use_attention:
-                        h0, h1 = attention_mod(h0, h1)
+                        z0, z1 = attention_mod(z0, z1)
                         
-                    feat_v0_list.append(h0.cpu().numpy())
-                    feat_v1_list.append(h1.cpu().numpy())
+                    feat_v0_list.append(z0.cpu().numpy())
+                    feat_v1_list.append(z1.cpu().numpy())
                     gt_list.append(labels.cpu().numpy())
             
             data = [np.concatenate(feat_v0_list), np.concatenate(feat_v1_list)]
