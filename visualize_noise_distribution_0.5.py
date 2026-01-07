@@ -18,12 +18,12 @@ def reconstruct_ground_truth(total_samples, seed):
     
     # 2. 定义区间 (必须与 data_loader_noisy_scene.py 一致)
     # View 1
-    intervals_v1 = [
+    intervals_v1_0_5 = [
         (0.0, 0.1, 0.2), (0.1, 0.2, 0.4), (0.2, 0.3, 0.6), 
         (0.3, 0.4, 0.8), (0.4, 0.5, 1.0), (0.5, 1.0, 0.0)
     ]
     # View 2
-    intervals_v2 = [
+    intervals_v2_0_5 = [
         (0.0, 0.4, 0.0), (0.4, 0.5, 0.2), (0.5, 0.6, 0.4), 
         (0.6, 0.7, 0.6), (0.7, 0.8, 0.8), (0.8, 0.9, 1.0), (0.9, 1.0, 0.0)
     ]
@@ -37,14 +37,14 @@ def reconstruct_ground_truth(total_samples, seed):
     # 但由于 npz 里存的已经是按 loader 顺序出来的 loss，我们只需要生成 loader 顺序的 GT 即可
     
     # View 1 GT
-    for start, end, alpha in intervals_v1:
+    for start, end, alpha in intervals_v1_0_5:
         s_idx = int(total_samples * start)
         e_idx = int(total_samples * end)
         if end >= 1.0: e_idx = total_samples
         gt_v1[s_idx:e_idx] = alpha
         
     # View 2 GT
-    for start, end, alpha in intervals_v2:
+    for start, end, alpha in intervals_v2_0_5:
         s_idx = int(total_samples * start)
         e_idx = int(total_samples * end)
         if end >= 1.0: e_idx = total_samples
@@ -111,13 +111,13 @@ def main():
 
     # 1. 加载数据
     try:
-        data = np.load('corruption_ratety.npz')
+        data = np.load('recon_error_0_5ty.npz')
         loss_v1 = data['recon_loss_v1']
         loss_v2 = data['recon_loss_v2']
         total_samples = len(loss_v1)
-        print(f"Loaded corruption_ratety.npz with {total_samples} samples.")
+        print(f"Loaded recon_error_0_5ty.npz with {total_samples} samples.")
     except FileNotFoundError:
-        print("Error: corruption_ratety.npz not found. Please run generate_quality_matrix.py first.")
+        print("Error: recon_error_0_5ty.npz not found. Please run generate_quality_matrix.py first.")
         return
 
     # 2. 恢复 GT 噪声标签 (用于分析，实际无监督训练时不使用)

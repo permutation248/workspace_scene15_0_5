@@ -86,16 +86,12 @@ def inject_gradual_noise_mixed(view_data, intervals, seed):
 
     return noisy_data
 
-class NoisySceneDataset(Dataset):
-    def __init__(self, view1, view2, labels, is_train=False):
-        """
-        :param is_train: 区分训练和推理模式 (影响 label 返回值)
-        """
+class SceneDataset(Dataset):
+    def __init__(self, view1, view2, labels):
         # 转置数据以匹配原始代码习惯: (Features, Samples)
         self.view1 = view1.T 
         self.view2 = view2.T
         self.labels = labels
-        self.is_train = is_train
         
         self.mask = np.ones((len(labels), 2), dtype=np.int64)
 
@@ -106,23 +102,18 @@ class NoisySceneDataset(Dataset):
         fea0 = fea0.unsqueeze(0)
         fea1 = fea1.unsqueeze(0)
 
-        real_class_label = torch.tensor(self.labels[index]).long()
+        label = torch.tensor(self.labels[index]).long()
         
-        if self.is_train:
-            label_out = torch.tensor(1).long() # 训练时伪装成正样本对
-        else:
-            label_out = real_class_label # 推理时返回真实标签
-        
-        class_labels0 = real_class_label
-        class_labels1 = real_class_label
+        class_labels0 = label
+        class_labels1 = label
         mask_val = torch.tensor(self.mask[index]).long()
         
-        return fea0, fea1, label_out, class_labels0, class_labels1, mask_val, index
+        return fea0, fea1, label, class_labels0, class_labels1, mask_val, index
 
     def __len__(self):
         return len(self.labels)
 
-def loader_cl_noise(train_bs, dataset_name, NetSeed):
+def loader_cl_noise_0_5(train_bs, dataset_name, NetSeed):
     """
     加载 Scene15 并根据设定添加渐变混合噪声
     """
@@ -149,7 +140,7 @@ def loader_cl_noise(train_bs, dataset_name, NetSeed):
     # ...
     # 40-50%: 100%污染 (纯噪声)
     # 50-100%: 干净 (0%污染)
-    intervals_v1 = [
+    intervals_v1_0_5 = [
         (0.0, 0.1, 0.2), 
         (0.1, 0.2, 0.4), 
         (0.2, 0.3, 0.6), 
@@ -164,7 +155,7 @@ def loader_cl_noise(train_bs, dataset_name, NetSeed):
     # ...
     # 80-90%: 100%污染
     # 90-100%: 干净
-    intervals_v2 = [
+    intervals_v2_0_5 = [
         (0.0, 0.4, 0.0), 
         (0.4, 0.5, 0.2), 
         (0.5, 0.6, 0.4), 
@@ -176,18 +167,18 @@ def loader_cl_noise(train_bs, dataset_name, NetSeed):
 
     # 4. 注入混合噪声
     print("Processing View 1...")
-    view1_noisy = inject_gradual_noise_mixed(view1, intervals_v1, seed=NetSeed + 1)
+    view1_noisy = inject_gradual_noise_mixed(view1, intervals_v1_0_5, seed=NetSeed + 1)
     
     print("Processing View 2...")
-    view2_noisy = inject_gradual_noise_mixed(view2, intervals_v2, seed=NetSeed + 2)
+    view2_noisy = inject_gradual_noise_mixed(view2, intervals_v2_0_5, seed=NetSeed + 2)
 
     # 5. 归一化 (混合后再进行归一化，符合特征预处理流程)
     view1_noisy = normalize(view1_noisy)
     view2_noisy = normalize(view2_noisy)
     
     # 6. 构建 Dataset
-    train_dataset = NoisySceneDataset(view1_noisy, view2_noisy, labels, is_train=True)
-    eval_dataset = NoisySceneDataset(view1_noisy, view2_noisy, labels, is_train=False)
+    train_dataset = SceneDataset(view1_noisy, view2_noisy, labels)
+    eval_dataset = SceneDataset(view1_noisy, view2_noisy, labels)
 
     # 7. 构建 Loader
     train_pair_loader = DataLoader(
@@ -209,7 +200,7 @@ def loader_cl_noise(train_bs, dataset_name, NetSeed):
 
 # 兼容性接口
 def get_train_loader(x0, x1, c0, c1, train_bs):
-    dataset = NoisySceneDataset(x0.T, x1.T, c0, is_train=True)
+    dataset = SceneDataset(x0.T, x1.T, c0)
     loader = DataLoader(
         dataset,
         batch_size=train_bs,

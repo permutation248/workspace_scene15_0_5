@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import logging
-from data_loader_noisy_scene import loader_cl_noise
+from data_loader_noisy_scene import loader_cl_noise_0_5
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -165,10 +165,10 @@ def main():
 
     # 2. 加载数据 (使用 Noisy Loader)
     # 注意：参数保持与 test_roll2.py 一致，确保加载相同的数据分布
-    train_loader, all_loader, _ = loader_cl_noise(
+    train_loader, all_loader, _ = loader_cl_noise_0_5(
         train_bs=args.batch_size, 
         dataset_name='Scene15', NetSeed=args.seed
-    )
+    )#NetSeed参数设置为1111
     
     # 获取数据维度
     # Scene15: View1 (20), View2 (59)
@@ -191,17 +191,17 @@ def main():
 
     # 4. 验证分析
     # 硬编码噪声区间 (需与 data_loader_noisy_scene.py 保持完全一致)
-    intervals_v1 = [
+    intervals_v1_0_5 = [
         (0.0, 0.1, 0.2), (0.1, 0.2, 0.4), (0.2, 0.3, 0.6), 
         (0.3, 0.4, 0.8), (0.4, 0.5, 1.0), (0.5, 1.0, 0.0)
     ]
-    intervals_v2 = [
+    intervals_v2_0_5 = [
         (0.0, 0.4, 0.0), (0.4, 0.5, 0.2), (0.5, 0.6, 0.4), 
         (0.6, 0.7, 0.6), (0.7, 0.8, 0.8), (0.8, 0.9, 1.0), (0.9, 1.0, 0.0)
     ]
 
-    levels_v1, losses_v1, _ = analyze_correlation(recon_loss_v1, intervals_v1, "View 1", total_samples)
-    levels_v2, losses_v2, _ = analyze_correlation(recon_loss_v2, intervals_v2, "View 2", total_samples)
+    levels_v1, losses_v1, _ = analyze_correlation(recon_loss_v1, intervals_v1_0_5, "View 1", total_samples)
+    levels_v2, losses_v2, _ = analyze_correlation(recon_loss_v2, intervals_v2_0_5, "View 2", total_samples)
 
     # 5. 可视化
     plt.figure(figsize=(12, 5))
@@ -230,7 +230,7 @@ def main():
     # 6. 保存质量矩阵 (用于后续训练脚本)
     # 保存为 (N, 2) 的矩阵，或者分开保存
     # 这里我们保存为字典形式，方便读取
-    save_path = 'corruption_rate.npz'
+    save_path = 'recon_error_0_5.npz'
     np.savez(save_path, 
              recon_loss_v1=recon_loss_v1, 
              recon_loss_v2=recon_loss_v2,

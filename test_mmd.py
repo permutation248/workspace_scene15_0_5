@@ -17,7 +17,7 @@ import umap
 from models import SUREfcScene
 from Clustering import Clustering
 from sure_inference import both_infer
-from data_loader_noisy_scene import loader_cl_noise
+from data_loader_noisy_scene import loader_cl_noise_0_5
 
 # 设置环境
 warnings.filterwarnings('ignore')
@@ -144,10 +144,10 @@ class WeightedMSELoss(nn.Module):
     def __init__(self):
         super(WeightedMSELoss, self).__init__()
     
-    def forward(self, input, target, quality_weights=None):
+    def forward(self, input, target, noise_score_0_5=None):
         loss = (input - target) ** 2
-        if quality_weights is not None:
-            w = quality_weights.view(-1, 1)
+        if noise_score_0_5 is not None:
+            w = noise_score_0_5.view(-1, 1)
             loss = loss * w
         return loss.mean()
 
@@ -192,7 +192,7 @@ def train_one_epoch(train_loader, backbone, criterions, optimizer, epoch, args, 
         indices = indices.to(device)
         
         # 1. 获取当前 Batch 的质量分数 (0~1, 1代表无噪声)
-        # quality_tensor 存储的是 noise_score (0干净, 1纯噪声)，所以要 1 - noise
+        # quality_tensor 存储的是 noise_score_0_5 (0干净, 1纯噪声)，所以要 1 - noise
         q1_raw = (1.0 - quality_tensor_v1[indices])
         q2_raw = (1.0 - quality_tensor_v2[indices])
         
@@ -246,7 +246,7 @@ def train_one_epoch(train_loader, backbone, criterions, optimizer, epoch, args, 
             
             # 可视化 (仅在特定Epoch的一个Batch做)
             if do_vis and not vis_done:
-                visualize_fusion_distribution(h0, h1, H_fused, epoch)
+                #visualize_fusion_distribution(h0, h1, H_fused, epoch)
                 vis_done = True
 
             # =========================================================================
@@ -292,16 +292,16 @@ def main():
     torch.cuda.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
 
-    if not os.path.exists('quality_weights.npz'):
-        raise FileNotFoundError("Run 'generate_quality_weights.py' first!")
+    if not os.path.exists('noise_score_0_5.npz'):
+        raise FileNotFoundError("Run 'generate_noise_score_0_5.py' first!")
     
     # 载入质量分数
-    q_data = np.load('quality_weights.npz')
-    quality_tensor_v1 = torch.from_numpy(q_data['noise_score_v1']).float().to(device)
-    quality_tensor_v2 = torch.from_numpy(q_data['noise_score_v2']).float().to(device)
+    q_data = np.load('noise_score_0_5.npz')
+    quality_tensor_v1 = torch.from_numpy(q_data['noise_score_0_5_v1']).float().to(device)
+    quality_tensor_v2 = torch.from_numpy(q_data['noise_score_0_5_v2']).float().to(device)
 
     # 载入数据
-    train_loader, all_loader, _ = loader_cl_noise(args.batch_size, args.data_name, args.seed)
+    train_loader, all_loader, _ = loader_cl_noise_0_5(args.batch_size, args.data_name, args.seed)
     
     total_samples = len(all_loader.dataset)
     print(f"Total samples detected: {total_samples}")
