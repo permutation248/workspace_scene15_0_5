@@ -352,12 +352,16 @@ def main():
             # 使用简单的拼接特征进行聚类评估
             data = [feat_v0_all, feat_v1_all]
             
+            # 聚类评估
             ret = Clustering(data, gt_label, random_state=args.seed)
             acc = ret['kmeans']['accuracy']
             nmi = ret['kmeans']['NMI']
+            ari = ret['kmeans']['ARI']
             
-            if acc > best_acc: best_acc = acc
-            logging.info(f"Epoch {epoch} Result: ACC={acc:.4f}, NMI={nmi:.4f} (Best: {best_acc:.4f})")
+            if acc > best_acc:
+                best_acc = acc
+            
+            logging.info(f"Epoch {epoch} Result: ACC={acc:.4f}, NMI={nmi:.4f}, ARI={ari:.4f} (Best ACC: {best_acc:.4f})")
 
     print(f"Final Best ACC: {best_acc:.4f}")
 
