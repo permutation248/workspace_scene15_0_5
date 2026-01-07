@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import argparse
+from data_loader_noisy_scene import INTERVALS_v1, INTERVALS_v2
 
 # 设置绘图风格
 sns.set_theme(style="whitegrid")
@@ -20,24 +21,13 @@ def reconstruct_ground_truth(total_samples, seed=1111):
     gt_v1 = np.zeros(total_samples)
     gt_v2 = np.zeros(total_samples)
 
-    # View 1 区间配置
-    intervals_v1_0_5 = [
-        (0.0, 0.1, 0.2), (0.1, 0.2, 0.4), (0.2, 0.3, 0.6), 
-        (0.3, 0.4, 0.8), (0.4, 0.5, 1.0), (0.5, 1.0, 0.0)
-    ]
-    # View 2 区间配置
-    intervals_v2_0_5 = [
-        (0.0, 0.4, 0.0), (0.4, 0.5, 0.2), (0.5, 0.6, 0.4), 
-        (0.6, 0.7, 0.6), (0.7, 0.8, 0.8), (0.8, 0.9, 1.0), (0.9, 1.0, 0.0)
-    ]
-
-    for start, end, alpha in intervals_v1_0_5:
+    for start, end, alpha in INTERVALS_v1:
         s = int(total_samples * start)
         e = int(total_samples * end)
         if end >= 1.0: e = total_samples
         gt_v1[s:e] = alpha
         
-    for start, end, alpha in intervals_v2_0_5:
+    for start, end, alpha in INTERVALS_v2:
         s = int(total_samples * start)
         e = int(total_samples * end)
         if end >= 1.0: e = total_samples
@@ -104,8 +94,8 @@ def main():
     args = parser.parse_args()
 
     # --- 配置路径 ---
-    input_path = 'recon_error_0_5.npz'
-    output_path = 'noise_score_0_5.npz'
+    input_path = 'recon_error.npz'
+    output_path = 'noise_score.npz'
     plot_path = 'quality_score_verification.png'
 
     print(f"[{sys.argv[0]}] Starting generation of Quality/Noise Weights...")
@@ -116,9 +106,9 @@ def main():
         return
 
     data = np.load(input_path)
-    recon_error_0_5_v1 = data['recon_loss_v1']
-    recon_error_0_5_v2 = data['recon_loss_v2']
-    total_samples = len(recon_error_0_5_v1)
+    recon_error_v1 = data['recon_loss_v1']
+    recon_error_v2 = data['recon_loss_v2']
+    total_samples = len(recon_error_v1)
     
     print(f"Loaded raw reconstruction errors for {total_samples} samples.")
 
@@ -139,17 +129,17 @@ def main():
         return normalized_score
 
     # 3. 执行映射
-    noise_score_0_5_v1 = map_error_to_score(recon_error_0_5_v1, "View 1")
-    noise_score_0_5_v2 = map_error_to_score(recon_error_0_5_v2, "View 2")
+    noise_score_v1 = map_error_to_score(recon_error_v1, "View 1")
+    noise_score_v2 = map_error_to_score(recon_error_v2, "View 2")
 
     # 4. 生成 Ground Truth 并可视化
     gt_v1, gt_v2 = reconstruct_ground_truth(total_samples, args.seed)
-    visualize_mapping(noise_score_0_5_v1, gt_v1, noise_score_0_5_v2, gt_v2, plot_path)
+    visualize_mapping(noise_score_v1, gt_v1, noise_score_v2, gt_v2, plot_path)
 
     # 5. 保存最终权重
     np.savez(output_path, 
-             noise_score_0_5_v1=noise_score_0_5_v1, 
-             noise_score_0_5_v2=noise_score_0_5_v2)
+             noise_score_v1=noise_score_v1, 
+             noise_score_v2=noise_score_v2)
     
     print(f"\n[Success] Final weights saved to: {output_path}")
 

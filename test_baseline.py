@@ -12,7 +12,7 @@ import warnings
 from models import SUREfcScene
 from Clustering import Clustering
 from sure_inference import both_infer
-from data_loader_noisy_scene import loader_cl_noise_0_5
+from data_loader_noisy_scene import loader_cl_noise
 
 
 # 设置环境
@@ -124,7 +124,7 @@ def main():
 
     # 3. 加载数据 (使用重构后的 clean loader)
     # 注意：loader_cl 内部会忽略 neg_prop 等噪声参数
-    train_loader, all_loader, _ = loader_cl_noise_0_5(
+    train_loader, all_loader, _ = loader_cl_noise(
         args.batch_size, args.data_name, args.seed
     )
 

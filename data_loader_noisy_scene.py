@@ -6,6 +6,48 @@ import torch
 import os
 from scipy import sparse
 
+# INTERVALS_v1= [
+#     (0.0, 0.1, 0.2), 
+#     (0.1, 0.2, 0.4), 
+#     (0.2, 0.3, 0.6), 
+#     (0.3, 0.4, 0.8), 
+#     (0.4, 0.5, 1.0), 
+#     (0.5, 1.0, 0.0)  
+# ]
+# INTERVALS_v2 = [
+#     (0.0, 0.4, 0.0), 
+#     (0.4, 0.5, 0.2), 
+#     (0.5, 0.6, 0.4), 
+#     (0.6, 0.7, 0.6), 
+#     (0.7, 0.8, 0.8), 
+#     (0.8, 0.9, 1.0), 
+#     (0.9, 1.0, 0.0)  
+# ]
+
+INTERVALS_v1 = [
+        (0.0, 0.3, 0.0),   # 前段干净数据
+        (0.3, 0.4, 0.2), 
+        (0.4, 0.5, 0.4), 
+        (0.5, 0.6, 0.6), 
+        (0.6, 0.7, 0.8), 
+        (0.7, 0.8, 1.0),   # 最后一等分 (纯噪声)
+        (0.8, 1.0, 0.0)    # 后段干净数据
+    ]
+
+INTERVALS_v2 = [
+        # --- 回绕部分 (0.0 - 0.2) ---
+        (0.0, 0.1, 0.8),   # 第4段 (原 1.0-1.1)
+        (0.1, 0.2, 1.0),   # 第5段 (原 1.1-1.2，纯噪声)
+        
+        # --- 中间干净部分 ---
+        (0.2, 0.7, 0.0), 
+        
+        # --- 正常顺序部分 (0.7 - 1.0) ---
+        (0.7, 0.8, 0.2),   # 第1段 (与 View 1 的 1.0 噪声段重叠)
+        (0.8, 0.9, 0.4),   # 第2段
+        (0.9, 1.0, 0.6)    # 第3段
+    ]
+
 def load_raw_mat(dataset_name, root_path='/home/wupeihan/Multi_View/data/'):
     """
     读取原始 .mat 文件并解析为 view1, view2, label
@@ -113,7 +155,7 @@ class SceneDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-def loader_cl_noise_0_5(train_bs, dataset_name, NetSeed):
+def loader_cl_noise(train_bs, dataset_name, NetSeed):
     """
     加载 Scene15 并根据设定添加渐变混合噪声
     """
@@ -130,47 +172,13 @@ def loader_cl_noise_0_5(train_bs, dataset_name, NetSeed):
     view1 = view1[perm_indices]
     view2 = view2[perm_indices]
     labels = labels[perm_indices]
-    
-    # 3. 定义噪声混合比例 (Start%, End%, Alpha)
-    # Alpha = 噪声占比
-    
-    # 视图一配置:
-    # 0-10%: 20%污染 (0.8 Raw + 0.2 Noise)
-    # 10-20%: 40%污染
-    # ...
-    # 40-50%: 100%污染 (纯噪声)
-    # 50-100%: 干净 (0%污染)
-    intervals_v1_0_5 = [
-        (0.0, 0.1, 0.2), 
-        (0.1, 0.2, 0.4), 
-        (0.2, 0.3, 0.6), 
-        (0.3, 0.4, 0.8), 
-        (0.4, 0.5, 1.0), 
-        (0.5, 1.0, 0.0)  
-    ]
-    
-    # 视图二配置:
-    # 0-40%: 干净
-    # 40-50%: 20%污染
-    # ...
-    # 80-90%: 100%污染
-    # 90-100%: 干净
-    intervals_v2_0_5 = [
-        (0.0, 0.4, 0.0), 
-        (0.4, 0.5, 0.2), 
-        (0.5, 0.6, 0.4), 
-        (0.6, 0.7, 0.6), 
-        (0.7, 0.8, 0.8), 
-        (0.8, 0.9, 1.0), 
-        (0.9, 1.0, 0.0)  
-    ]
 
     # 4. 注入混合噪声
     print("Processing View 1...")
-    view1_noisy = inject_gradual_noise_mixed(view1, intervals_v1_0_5, seed=NetSeed + 1)
+    view1_noisy = inject_gradual_noise_mixed(view1, INTERVALS_v1, seed=NetSeed + 1)
     
     print("Processing View 2...")
-    view2_noisy = inject_gradual_noise_mixed(view2, intervals_v2_0_5, seed=NetSeed + 2)
+    view2_noisy = inject_gradual_noise_mixed(view2, INTERVALS_v2, seed=NetSeed + 2)
 
     # 5. 归一化 (混合后再进行归一化，符合特征预处理流程)
     view1_noisy = normalize(view1_noisy)

@@ -5,6 +5,8 @@ import pandas as pd
 import os
 import argparse
 
+from data_loader_noisy_scene import INTERVALS_v1, INTERVALS_v2
+
 # 设置绘图风格
 sns.set_theme(style="whitegrid")
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 兼容性字体
@@ -17,30 +19,8 @@ def reconstruct_ground_truth(total_samples):
     gt_v1 = np.zeros(total_samples)
     gt_v2 = np.zeros(total_samples)
 
-    # === View 1 噪声区间配置 (来自你的代码) ===
-    # (Start Ratio, End Ratio, Alpha)
-    intervals_v1_0_5 = [
-        (0.0, 0.1, 0.2), 
-        (0.1, 0.2, 0.4), 
-        (0.2, 0.3, 0.6), 
-        (0.3, 0.4, 0.8), 
-        (0.4, 0.5, 1.0), 
-        (0.5, 1.0, 0.0)  
-    ]
-    
-    # === View 2 噪声区间配置 (来自你的代码) ===
-    intervals_v2_0_5 = [
-        (0.0, 0.4, 0.0), 
-        (0.4, 0.5, 0.2), 
-        (0.5, 0.6, 0.4), 
-        (0.6, 0.7, 0.6), 
-        (0.7, 0.8, 0.8), 
-        (0.8, 0.9, 1.0), 
-        (0.9, 1.0, 0.0)  
-    ]
-
     # 生成 View 1 标签
-    for start, end, alpha in intervals_v1_0_5:
+    for start, end, alpha in INTERVALS_v1:
         s_idx = int(total_samples * start)
         e_idx = int(total_samples * end)
         if end >= 1.0: e_idx = total_samples
@@ -48,7 +28,7 @@ def reconstruct_ground_truth(total_samples):
             gt_v1[s_idx:e_idx] = alpha
             
     # 生成 View 2 标签
-    for start, end, alpha in intervals_v2_0_5:
+    for start, end, alpha in INTERVALS_v2:
         s_idx = int(total_samples * start)
         e_idx = int(total_samples * end)
         if end >= 1.0: e_idx = total_samples
@@ -99,7 +79,7 @@ def load_npz_data(filepath, key_prefix):
     # 尝试常见的 key 命名模式
     v1, v2 = None, None
     
-    # 模式 1: noise_score_0_5_v1, noise_score_0_5_v2
+    # 模式 1: noise_score_v1, noise_score_v2
     if f'{key_prefix}_v1' in keys:
         v1 = data[f'{key_prefix}_v1']
         v2 = data[f'{key_prefix}_v2']
@@ -121,13 +101,13 @@ def load_npz_data(filepath, key_prefix):
 
 def main():
     # 文件路径配置
-    recon_file = 'recon_error_0_5.npz'
-    score_file = 'noise_score_0_5.npz'
+    recon_file = 'recon_error.npz'
+    score_file = 'noise_score.npz'
     
     # 1. 加载 Recon Error
     recon_v1, recon_v2 = load_npz_data(recon_file, 'recon_loss')
     # 2. 加载 Noise Score
-    score_v1, score_v2 = load_npz_data(score_file, 'noise_score_0_5')
+    score_v1, score_v2 = load_npz_data(score_file, 'noise_score')
     
     if recon_v1 is None and score_v1 is None:
         print("No data found. Please check file names.")
@@ -144,13 +124,13 @@ def main():
     if recon_v1 is not None:
         plot_metric_vs_noise(recon_v1, gt_v1, recon_v2, gt_v2, 
                              metric_name="Recon Error (MSE)", 
-                             save_name="vis_box_recon_error_0_5.png")
+                             save_name="vis_box_recon_error.png")
 
     # 5. 绘制 Noise Score 箱线图
     if score_v1 is not None:
         plot_metric_vs_noise(score_v1, gt_v1, score_v2, gt_v2, 
                              metric_name="Noise Score (Normalized)", 
-                             save_name="vis_box_noise_score_0_5.png")
+                             save_name="vis_box_noise_score.png")
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,7 @@ import umap
 from models import SUREfcScene
 from Clustering import Clustering
 from sure_inference import both_infer
-from data_loader_noisy_scene import loader_cl_noise_0_5
+from data_loader_noisy_scene import loader_cl_noise
 
 # 设置环境
 warnings.filterwarnings('ignore')
@@ -144,10 +144,10 @@ class WeightedMSELoss(nn.Module):
     def __init__(self):
         super(WeightedMSELoss, self).__init__()
     
-    def forward(self, input, target, noise_score_0_5=None):
+    def forward(self, input, target, noise_score=None):
         loss = (input - target) ** 2
-        if noise_score_0_5 is not None:
-            w = noise_score_0_5.view(-1, 1)
+        if noise_score is not None:
+            w = noise_score.view(-1, 1)
             loss = loss * w
         return loss.mean()
 
@@ -192,7 +192,7 @@ def train_one_epoch(train_loader, backbone, criterions, optimizer, epoch, args, 
         indices = indices.to(device)
         
         # 1. 获取当前 Batch 的质量分数 (0~1, 1代表无噪声)
-        # quality_tensor 存储的是 noise_score_0_5 (0干净, 1纯噪声)，所以要 1 - noise
+        # quality_tensor 存储的是 noise_score (0干净, 1纯噪声)，所以要 1 - noise
         q1_raw = (1.0 - quality_tensor_v1[indices])
         q2_raw = (1.0 - quality_tensor_v2[indices])
         
@@ -292,16 +292,16 @@ def main():
     torch.cuda.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
 
-    if not os.path.exists('noise_score_0_5.npz'):
-        raise FileNotFoundError("Run 'generate_noise_score_0_5.py' first!")
+    if not os.path.exists('noise_score.npz'):
+        raise FileNotFoundError("Run 'generate_noise_score.py' first!")
     
     # 载入质量分数
-    q_data = np.load('noise_score_0_5.npz')
-    quality_tensor_v1 = torch.from_numpy(q_data['noise_score_0_5_v1']).float().to(device)
-    quality_tensor_v2 = torch.from_numpy(q_data['noise_score_0_5_v2']).float().to(device)
+    q_data = np.load('noise_score.npz')
+    quality_tensor_v1 = torch.from_numpy(q_data['noise_score_v1']).float().to(device)
+    quality_tensor_v2 = torch.from_numpy(q_data['noise_score_v2']).float().to(device)
 
     # 载入数据
-    train_loader, all_loader, _ = loader_cl_noise_0_5(args.batch_size, args.data_name, args.seed)
+    train_loader, all_loader, _ = loader_cl_noise(args.batch_size, args.data_name, args.seed)
     
     total_samples = len(all_loader.dataset)
     print(f"Total samples detected: {total_samples}")
