@@ -6,53 +6,53 @@ import torch
 import os
 from scipy import sparse
 
-# INTERVALS_v1= [
-#     (0.0, 0.1, 0.2), 
-#     (0.1, 0.2, 0.4), 
-#     (0.2, 0.3, 0.6), 
-#     (0.3, 0.4, 0.8), 
-#     (0.4, 0.5, 1.0), 
-#     (0.5, 1.0, 0.0)  
-# ]
-# INTERVALS_v2 = [
-#     (0.0, 0.4, 0.0), 
-#     (0.4, 0.5, 0.2), 
-#     (0.5, 0.6, 0.4), 
-#     (0.6, 0.7, 0.6), 
-#     (0.7, 0.8, 0.8), 
-#     (0.8, 0.9, 1.0), 
-#     (0.9, 1.0, 0.0)  
-# ]
-
-INTERVALS_v1 = [
-        (0.0, 0.3, 0.0),   # 前段干净数据
-        (0.3, 0.4, 0.2), 
-        (0.4, 0.5, 0.4), 
-        (0.5, 0.6, 0.6), 
-        (0.6, 0.7, 0.8), 
-        (0.7, 0.8, 1.0),   # 最后一等分 (纯噪声)
-        (0.8, 1.0, 0.0)    # 后段干净数据
-    ]
-
+INTERVALS_v1= [
+    (0.0, 0.1, 0.2), 
+    (0.1, 0.2, 0.4), 
+    (0.2, 0.3, 0.6), 
+    (0.3, 0.4, 0.8), 
+    (0.4, 0.5, 1.0), 
+    (0.5, 1.0, 0.0)  
+]
 INTERVALS_v2 = [
-        # --- 回绕部分 (0.0 - 0.2) ---
-        (0.0, 0.1, 0.8),   # 第4段 (原 1.0-1.1)
-        (0.1, 0.2, 1.0),   # 第5段 (原 1.1-1.2，纯噪声)
+    (0.0, 0.4, 0.0), 
+    (0.4, 0.5, 0.2), 
+    (0.5, 0.6, 0.4), 
+    (0.6, 0.7, 0.6), 
+    (0.7, 0.8, 0.8), 
+    (0.8, 0.9, 1.0), 
+    (0.9, 1.0, 0.0)  
+]
+
+# INTERVALS_v1 = [
+#         (0.0, 0.3, 0.0),   # 前段干净数据
+#         (0.3, 0.4, 0.2), 
+#         (0.4, 0.5, 0.4), 
+#         (0.5, 0.6, 0.6), 
+#         (0.6, 0.7, 0.8), 
+#         (0.7, 0.8, 1.0),   # 最后一等分 (纯噪声)
+#         (0.8, 1.0, 0.0)    # 后段干净数据
+#     ]
+
+# INTERVALS_v2 = [
+#         # --- 回绕部分 (0.0 - 0.2) ---
+#         (0.0, 0.1, 0.8),   # 第4段 (原 1.0-1.1)
+#         (0.1, 0.2, 1.0),   # 第5段 (原 1.1-1.2，纯噪声)
         
-        # --- 中间干净部分 ---
-        (0.2, 0.7, 0.0), 
+#         # --- 中间干净部分 ---
+#         (0.2, 0.7, 0.0), 
         
-        # --- 正常顺序部分 (0.7 - 1.0) ---
-        (0.7, 0.8, 0.2),   # 第1段 (与 View 1 的 1.0 噪声段重叠)
-        (0.8, 0.9, 0.4),   # 第2段
-        (0.9, 1.0, 0.6)    # 第3段
-    ]
+#         # --- 正常顺序部分 (0.7 - 1.0) ---
+#         (0.7, 0.8, 0.2),   # 第1段 (与 View 1 的 1.0 噪声段重叠)
+#         (0.8, 0.9, 0.4),   # 第2段
+#         (0.9, 1.0, 0.6)    # 第3段
+#     ]
 
 def load_raw_mat(dataset_name, root_path='/home/wupeihan/Multi_View/data/'):
     """
     读取原始 .mat 文件并解析为 view1, view2, label
     """
-    path = os.path.join(root_path, dataset_name + '.mat')
+    path = os.path.join(root_path, 'Scene15/',dataset_name + '.mat')
     if not os.path.exists(path):
         raise FileNotFoundError(f"Dataset file not found: {path}")
     
@@ -187,6 +187,46 @@ def loader_cl_noise(train_bs, dataset_name, NetSeed):
     # 6. 构建 Dataset
     train_dataset = SceneDataset(view1_noisy, view2_noisy, labels)
     eval_dataset = SceneDataset(view1_noisy, view2_noisy, labels)
+
+    # 7. 构建 Loader
+    train_pair_loader = DataLoader(
+        train_dataset,
+        batch_size=train_bs,
+        shuffle=True, # 训练时打乱
+        drop_last=False,
+        num_workers=0
+    )
+
+    all_loader = DataLoader(
+        eval_dataset,
+        batch_size=128,
+        shuffle=False, # 推理时保持顺序
+        num_workers=0
+    )
+
+    return train_pair_loader, all_loader, NetSeed
+
+def loader_clean(train_bs, dataset_name, NetSeed):
+    """
+    加载 Scene15 
+    """
+    print(f"========== Loading Scene15  (Seed: {NetSeed}) ==========")
+    
+    # 1. 加载原始数据
+    view1, view2, labels = load_raw_mat('Scene15')
+    N = labels.shape[0]
+    
+    # 2. 打乱数据 (确保噪声分布随机，不偏向特定类别)
+    rng = np.random.RandomState(NetSeed)
+    perm_indices = rng.permutation(N)
+    
+    view1 = view1[perm_indices]
+    view2 = view2[perm_indices]
+    labels = labels[perm_indices]
+    
+    # 6. 构建 Dataset
+    train_dataset = SceneDataset(view1, view2, labels)
+    eval_dataset = SceneDataset(view1, view2, labels)
 
     # 7. 构建 Loader
     train_pair_loader = DataLoader(

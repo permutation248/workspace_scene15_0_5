@@ -9,10 +9,10 @@ import numpy as np
 import warnings
 
 # 引入必要的模块 (请确保这些文件在同一目录下)
-from models import SUREfcScene
+from models import SUREfc
 from Clustering import Clustering
 from sure_inference import both_infer
-from data_loader_noisy_scene import loader_cl_noise
+from data_loader_noisy_scene import loader_cl_noise,loader_clean
 
 
 # 设置环境
@@ -124,12 +124,12 @@ def main():
 
     # 3. 加载数据 (使用重构后的 clean loader)
     # 注意：loader_cl 内部会忽略 neg_prop 等噪声参数
-    train_loader, all_loader, _ = loader_cl_noise(
+    train_loader, all_loader, _ = loader_clean(
         args.batch_size, args.data_name, args.seed
     )
 
     # 4. 初始化模型 (针对 Scene15)
-    model = SUREfcScene().to(device)
+    model = SUREfc().to(device)
     
     # 5. 优化器与损失
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -150,8 +150,22 @@ def main():
             v0, v1, gt_label = both_infer(model, device, all_loader, setting=2, cri=None, return_data=False)
             data = [v0, v1]
             
-            # 聚类评估
-            ret = Clustering(data, gt_label, random_state=args.seed)
+            # --- 新增：统计数据量 ---
+            # data 是一个列表 [v0, v1]，每个元素通常是维度为 (N, D) 的 numpy 数组或 tensor
+            num_samples = data[0].shape[0] if hasattr(data[0], 'shape') else len(data[0])
+            num_views = len(data)
+            logging.info("Clustering input: {} samples, {} views".format(num_samples, num_views))
+
+            # --- 新增：统计计算时间 ---
+            cluster_start_time = time.time()
+            
+            ret = Clustering(data, gt_label)
+            
+            cluster_end_time = time.time()
+            cluster_duration = cluster_end_time - cluster_start_time
+            logging.info("Clustering duration: {:.4f} seconds".format(cluster_duration))
+
+
             acc = ret['kmeans']['accuracy']
             nmi = ret['kmeans']['NMI']
             ari = ret['kmeans']['ARI']

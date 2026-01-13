@@ -6,7 +6,7 @@ import copy
 class SUREfcScene(nn.Module):  # 20, 59
     def __init__(self):
         super(SUREfcScene, self).__init__()
-        num_fea = 512
+        num_fea = 10
 
         self.encoder0 = nn.Sequential(
             nn.Linear(20, 1024),
